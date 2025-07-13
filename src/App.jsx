@@ -1,33 +1,76 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import pfp from './images/pfp1.gif';
-import view from './images/viewW.svg';
 import twitter from './images/x.png';
 import insta from './images/insta.png';
 import yt from './images/yt.png';
 import discord from './images/discord.png';
-import cover from './images/cover.png';
-import stop from './song/stopplayin.mp3';
-import bg from './videos/car.mp4';
+import cover from './images/cover1.jpeg';
+import cover2 from './images/cover2.jpg';
+import track1 from './song/sticktogether.mp3';
+import track2 from './song/slowdown.mp3';
+import bg from './videos/cod.mp4';
 import git from './images/git2.png';
 
 function App() {
-  const [viewCount, setViewCount] = useState(3242);
+  const audioRef = useRef(null);  
   const [currentTime, setCurrentTime] = useState(0);
-  const maxTime = 128;
   const [isPlaying, setIsPlaying] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
   const [isOverlayClicked, setIsOverlayClicked] = useState(false);
   const [copyStatus, setCopyStatus] = useState('');
-  const [cssLabel, setCssLabel] = useState('Copy BTC Address');
-  const [cssLabel1, setCssLabel1] = useState('Copy LTC Address');
   const [bio, setBio] = useState('');
   const [entered, setEntered] = useState(false); // State for animation
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+
+  const tracks = [
+  {
+    src: track1,
+    title: "Stick Together",
+    artist: "Elijah N",
+    album: "No Album",
+    cover: cover,
+    url: "https://music.youtube.com/watch?v=LaRzVVYH1x4"
+  },
+  {
+    src: track2,
+    title: "Slow Down",
+    artist: "Lights Follow",
+    album: "No Album",
+    cover: cover2,
+    url: "https://music.youtube.com/watch?v=BdKw0uGbzW8"
+  },
+];
+
 
   // Typewriter effect
-  const [bioText, setBioText] = useState("Owner of shdw.site");
+  const [bioText, setBioText] = useState("Life is eternal, and love is immortal, and death is only a horizon; and a horizon is nothing save the limit of our sight.");
   const [index, setIndex] = useState(0);
   const [isTyping, setIsTyping] = useState(true);
+
+  useEffect(() => {
+  const audioElement = audioRef.current;
+  if (!audioElement) return;
+
+  const handleLoadedMetadata = () => {
+    setMaxTime(audioElement.duration);
+  };
+
+  audioElement.addEventListener('loadedmetadata', handleLoadedMetadata);
+
+  return () => {
+    audioElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
+  };
+}, [currentTrackIndex]);
+
+  useEffect(() => {
+  if (audioRef.current && isOverlayClicked) {
+    audioRef.current.load();    // Reload new track source
+    audioRef.current.play();    // Play the new track
+    setIsPlaying(true);
+  }
+}, [currentTrackIndex, isOverlayClicked]);
+
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -46,50 +89,83 @@ function App() {
           setIsTyping(true);
         }
       }
-    }, 50);
+    }, 100);
 
     return () => clearInterval(timer); // Cleanup the timer
   }, [bioText, index, isTyping]);
 
-  useEffect(() => {
-    fetch('/increment-view')
-      .then(response => response.json())
-      .then(data => setViewCount(data.viewCount))
-      .catch(error => console.error('Error:', error));
-
-    // Other side effects...
-
-  }, []);
 
   function formatTime(seconds) {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.round(seconds % 60);
-    const formattedTime = `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
-    return formattedTime;
+    return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
   }
 
+  // Update currentTime and handle track end
   useEffect(() => {
-    const audioElement = document.getElementById('audio');
+    const audioElement = audioRef.current;
+    if (!audioElement) return;
 
     if (!isPlaying && isOverlayClicked) {
-      audioPlay();
+      audioElement.play();
       setIsPlaying(true);
     }
 
     const interval = setInterval(() => {
-      const elapsedTime = Math.round(audioElement.currentTime);
-      setCurrentTime(elapsedTime);
+      setCurrentTime(audioElement.currentTime);
 
-      if (elapsedTime >= maxTime) {
-        audioElement.currentTime = 0;
-        setCurrentTime(0);
+      if (audioElement.ended) {
+        // Auto play next track
+        handleNextTrack();
       }
-    }, 1000);
+    }, 500);
 
-    return () => {
-      clearInterval(interval);
-    };
-  }, [isPlaying, isOverlayClicked, maxTime]);
+    return () => clearInterval(interval);
+  }, [isPlaying, isOverlayClicked, currentTrackIndex]);
+
+  const currentTrack = tracks[currentTrackIndex];
+  const [maxTime, setMaxTime] = useState(0);
+
+
+  // Controls
+
+  function audioPlay() {
+    if (audioRef.current) {
+      audioRef.current.volume = 1;
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
+  }
+
+  const handlePlayPause = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
+  };
+
+  const handleNextTrack = () => {
+    setCurrentTrackIndex((prevIndex) => (prevIndex + 1) % tracks.length);
+    setCurrentTime(0);
+  };
+
+  const handlePrevTrack = () => {
+    setCurrentTrackIndex((prevIndex) =>
+      prevIndex === 0 ? tracks.length - 1 : prevIndex - 1
+    );
+    setCurrentTime(0);
+  };
+
+  const handleOverlayClick = () => {
+    setShowOverlay(false);
+    setIsOverlayClicked(true);
+    audioPlay();
+    setEntered(true);
+  };
 
   const handleCopyAddress = (address, label) => {
     navigator.clipboard.writeText(address)
@@ -103,7 +179,7 @@ function App() {
       })
       .catch(error => console.error('Error copying address to clipboard:', error));
   };
-  
+
   const handleCopyAddress1 = (address, label) => {
     navigator.clipboard.writeText(address)
       .then(() => {
@@ -116,29 +192,6 @@ function App() {
       })
       .catch(error => console.error('Error copying address to clipboard:', error));
   };
-  
-  function audioPlay() {
-    var audio = document.getElementById('audio');
-    audio.volume = 1;
-    audio.play();
-  }
-
-  const handlePlayPause = () => {
-    const audioElement = document.getElementById('audio');
-    if (isPlaying) {
-      audioElement.pause();
-    } else {
-      audioElement.play();
-    }
-    setIsPlaying(!isPlaying);
-  };
-
-  const handleOverlayClick = () => {
-    setShowOverlay(false);
-    setIsOverlayClicked(true);
-    audioPlay();
-    setEntered(true); // Trigger the animation
-  };
 
   return (
     <div className='app-container'>
@@ -146,69 +199,86 @@ function App() {
         <source src={bg} type='video/mp4' />
         Your browser does not support the video tag.
       </video>
+
       {showOverlay && (
         <div className='overlay' onClick={handleOverlayClick}>
-          <p1 className='click'>Click Anywhere</p1>
+          <p className='click'>Click Anywhere</p>
         </div>
       )}
+
       <div className={`main-container ${entered ? 'entered' : ''}`}>
-        <img src={view} className='view' alt="View Icon" />
-        <p1 className='num'>{viewCount}</p1>
         <img src={pfp} className='pfp' alt="Profile Picture" />
-        <div className='info' >
-          <h1 className='name'>shadow</h1>
-          <h1 className='bio'>{bio}</h1> {/* Bio with typewriter effect */}
+        <div className='info'>
+          <h1 className='name'>alphaTCT3209</h1>
+          <h1 className='bio'>{bio}</h1>
         </div>
+
         <div className='links'>
           <a href="https://twitter.com/2HB2QedJXb7055" target="_blank" rel="noopener noreferrer">
             <img src={twitter} className='link1' alt="Twitter" />
           </a>
-          <a href="https://github.com/movemented" target="_blank" rel="noopener noreferrer">
+          <a href="https://github.com/alphatct3209" target="_blank" rel="noopener noreferrer">
             <img src={git} className='link2' alt="GitHub" />
           </a>
           <a href="https://www.instagram.com/movemented/" target="_blank" rel="noopener noreferrer">
             <img src={insta} className='link3' alt="Instagram" />
           </a>
-          <a href="https://www.youtube.com/channel/UCbrSndkaflZIa6HaCBHLRvA" target="_blank" rel="noopener noreferrer">
+          <a href="https://www.youtube.com/@alphaTCT3209" target="_blank" rel="noopener noreferrer">
             <img src={yt} className='link4' alt="YouTube" />
           </a>
-          <a href="https://discord.com/users/1079862959360184390" target="_blank" rel="noopener noreferrer">
+          <a href="https://discord.com/users/719202658048540940" target="_blank" rel="noopener noreferrer">
             <img src={discord} className='link5' alt="Discord" />
           </a>
         </div>
+
         <div className='div1'></div>
+
         <div className='song'>
           <div className='progress-bar-container'>
             <div className='progress-bar' style={{ width: `${(currentTime / maxTime) * 100}%` }} />
           </div>
-          <a href='https://soundcloud.com/trapdailysounds/glokk40spaz-sg-lul-ki-stop-playin-prod-by-khroam' target='_blank' rel='noopener noreferrer'>
-            <img src={cover} className='songcover' alt='' />
-          </a>
+
+          <a href={currentTrack.url} target='_blank' rel='noopener noreferrer'>
+  <img src={currentTrack.cover} className='songcover' alt='Cover' />
+</a>
+
+
           <div className='songinfo'>
-            <p1 className='songtitle'>Wokeup</p1>
-            <p1 className='artist'>by Kankan</p1>
-            <p1 className='album' href>on Wokeup</p1>
+            <p className='songtitle'>{currentTrack.title}</p>
+            <p className='artist'>by {currentTrack.artist}</p>
+            <p className='album'>{currentTrack.album}</p>
           </div>
+
           <div className='time-label'>
             {formatTime(currentTime)} / {formatTime(maxTime)}
           </div>
-          <audio id='audio' src={stop} />
+
+          <audio
+            id='audio'
+            src={currentTrack.src}
+            ref={audioRef}
+            onEnded={handleNextTrack}
+          />
         </div>
+
         <div className='div2'></div>
-        <button
-          className='button2'
-          onClick={() => handleCopyAddress1('ltc1qwu5kth29x3ev63fuex4ln873kdwdxdnvw0fvdq', 'LTC Address')}
-          data-label={cssLabel1}
-        >
-          LTC
-        </button>
-        <button
-          className='button1'
-          onClick={() => handleCopyAddress('bc1qmdde26zln58kprcz2fxf7980ad9jfnpxa7ev4p', 'BTC Address')}
-          data-label={cssLabel}
-        >
-          BTC
-        </button>
+
+        <div className="rich-presence">
+          <a href="https://example.com" target="_blank" rel="noopener noreferrer">
+            <img
+              src="https://i.imgur.com/qJf9Ssh.jpg"
+              alt="Presence Cover"
+              className="presence-cover"
+            />
+          </a>
+
+          <div className="presence-info">
+            <p className="presence-title">Blackhawk Rescue Mission 5</p>
+            <p className="presence-desc">Playing Openworld in RonoGrad</p>
+            <p className="presence-party">In a Party (5 of 30)</p>
+          </div>
+        </div>
+
       </div>
     </div>
   );
